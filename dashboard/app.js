@@ -3,6 +3,10 @@
 // token view set apart from the ranking, and a per-protocol detail drawer with the model's inputs,
 // its arithmetic and the protocol's farm plan — the very strings board.json holds. No network:
 // every byte it shows arrived in data.js.
+//
+// The page is one render function driven by a small state object (search text, category, tab,
+// sort key/direction, selected slug). Every control mutates state and re-renders; the URL hash
+// mirrors the state so a view can be linked and the detail drawer survives a reload.
 (function () {
   'use strict';
 
@@ -11,6 +15,8 @@
   var app = document.getElementById('board');
   var state = { q: '', category: 'all', tab: 'pre-token', sort: 'implied', dir: -1, selected: null };
 
+  // Number formatting: compact dollars for the table ($1.23B / $45.6M / $789K), signed percents,
+  // ages as days or years, multiples as x0.214. Nulls render as 'n/a' or 'unknown', never NaN.
   var usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
   function fmtUsd(n) {
     if (n === null || n === undefined || !isFinite(n)) return 'n/a';
@@ -50,6 +56,9 @@
     return 'global peer median (category has fewer than ' + DATA.model.category_min_peers + ' traded peers)';
   }
 
+  // A tiny element builder: el('div', { class: 'x', text: 'y', onclick: fn }, child, 'text', [...]).
+  // Attribute keys starting with 'on' become listeners, 'text' becomes textContent, anything else
+  // becomes a real attribute (null values are skipped). Children may be nodes, strings or arrays.
   function el(tag, attrs) {
     var node = document.createElement(tag);
     if (attrs) {
@@ -70,6 +79,7 @@
     return node;
   }
 
+  // The hash is the shareable form of the view state: q (search), category, p (open protocol).
   function readHash() {
     var hash = window.location.hash.replace(/^#/, '');
     if (!hash) return;
@@ -88,6 +98,7 @@
     else window.history.replaceState(null, '', window.location.pathname + window.location.search);
   }
 
+  // The board rows after the search/category filter (before sorting).
   function rows() {
     var q = state.q.trim().toLowerCase();
     return DATA.rows.filter(function (r) {
@@ -97,6 +108,8 @@
       return hay.indexOf(q) >= 0;
     });
   }
+  // Sort by the active key; missing growth sorts last, missing age sorts as oldest, and slug is the
+  // stable tie-break so the order never depends on the engine's sort implementation.
   function sortedRows(list) {
     var key = state.sort;
     return list.slice().sort(function (a, b) {
@@ -148,6 +161,8 @@
     );
   }
 
+  // The model, stated on the page itself: the formula with the live constants filled in, the
+  // plain-language explanation, and a chip per category multiple so the inputs are inspectable.
   function modelPanel() {
     var m = DATA.model;
     var chips = [el('span', { class: 'mult-chip global' }, 'All traded protocols ', el('b', { text: fmtMult(DATA.global_multiple) }))];
@@ -184,6 +199,8 @@
     );
   }
 
+  // A clickable column header: clicking the active key flips direction, a new key starts in its
+  // natural direction (names ascending, everything else descending).
   function sortHeader(key, label, numeric) {
     return el('th', { scope: 'col', class: numeric ? 'num-head' : '' },
       el('button', { type: 'button', onclick: function () { if (state.sort === key) state.dir = -state.dir; else { state.sort = key; state.dir = key === 'name' ? 1 : -1; } render(); } },
@@ -251,6 +268,8 @@
     );
   }
 
+  // The live-token view: protocols that already trade, shown at the market's own market cap and
+  // deliberately kept out of the ranking — they are the peer evidence, not the ranked.
   function liveTable() {
     var tbody = el('tbody');
     DATA.live.forEach(function (r) {
@@ -274,6 +293,8 @@
     );
   }
 
+  // The detail drawer is one persistent <dialog>, refilled per protocol. Closing it clears the
+  // selection (and the hash) and re-renders so the table's selected-row highlight drops.
   var dialog = el('dialog', { class: 'detail', id: 'detail', 'aria-labelledby': 'detail-title' });
   dialog.addEventListener('close', function () { state.selected = null; writeHash(); render(); });
 
@@ -330,6 +351,8 @@
     }
   }
 
+  // One render pass rebuilds the whole shell from state; the dialog is re-attached if a previous
+  // pass dropped it, and a selected slug (from the hash or a click) reopens its drawer.
   function render() {
     app.textContent = '';
     var shell = el('div', { class: 'shell' });

@@ -1,5 +1,7 @@
 /* Launch Radar's dark theme. One ink-navy canvas, one mint accent, amber reserved for the
-   watchlist mark; numbers always in the mono face so columns of figures line up at a glance. */
+   watchlist mark; numbers always in the mono face so columns of figures line up at a glance.
+   Layout is a single centered shell: header, lede with a facts rail, the model panel, the
+   filter controls, then one table panel. The detail view is a right-hand drawer dialog. */
 :root {
   --canvas: #0a0e13;
   --surface: #10161d;
@@ -44,6 +46,7 @@ h3 { font-size: 16px; line-height: 1.25; font-weight: 650; }
 p { margin: 0; }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
+/* The skip link stays off-canvas until it takes keyboard focus. */
 .skip {
   position: absolute; left: -9999px; top: 0; padding: var(--step-2) var(--step-4);
   background: var(--raised); border: 1px solid var(--border); z-index: 20; color: var(--ink);
@@ -52,6 +55,7 @@ button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .shell { max-width: 1340px; margin: 0 auto; padding: var(--step-5) var(--step-6) var(--step-7); }
+/* Header: brand mark on the left, snapshot/model metadata wrapped to the right. */
 .top {
   display: flex; align-items: center; justify-content: space-between; gap: var(--step-5);
   padding-bottom: var(--step-4); border-bottom: 1px solid var(--border);
@@ -72,6 +76,7 @@ button { cursor: pointer; }
 .top-meta span { white-space: nowrap; }
 .top-meta .num { color: var(--ink); }
 
+/* Lede: the claim on the left, the five headline facts as a ruled rail on the right. */
 .lede { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(290px, 0.65fr); gap: var(--step-6); padding: var(--step-6) 0 var(--step-5); }
 .lede p { color: var(--muted); max-width: 62ch; margin-top: var(--step-2); }
 .lede p b { color: var(--ink); font-weight: 600; }
@@ -80,6 +85,7 @@ button { cursor: pointer; }
 .fact b { font-family: var(--font-num); font-size: 15px; font-weight: 500; }
 .fact span { color: var(--muted); font-size: 13px; }
 
+/* The model panel: formula in mono on the bare canvas, then one chip per peer multiple. */
 .model { padding: var(--step-5); display: grid; gap: var(--step-3); margin-bottom: var(--step-4); }
 .model h2 { font-size: 17px; }
 .model .sub { max-width: 78ch; }
@@ -97,6 +103,7 @@ button { cursor: pointer; }
 .mult-chip b { color: var(--ink); font-weight: 500; }
 .mult-chip.global { border-color: var(--accent-dim); color: var(--ink); }
 
+/* Filter controls: search, category select and the pre-token/live tab switch on one rule. */
 .controls { display: flex; flex-wrap: wrap; align-items: end; gap: var(--step-3); padding: var(--step-4) 0; border-top: 1px solid var(--border); }
 .field { display: grid; gap: var(--step-1); }
 .field label, .field .sub-label { color: var(--muted); font-size: 12px; }
@@ -111,6 +118,7 @@ button { cursor: pointer; }
 .tabs button[aria-pressed="true"] { background: var(--accent); color: #06231a; font-weight: 600; }
 .count { margin-left: auto; color: var(--muted); font-size: 13px; align-self: center; }
 
+/* The board table: numeric columns right-aligned in the mono face, implied value with its bar. */
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-panel); overflow: hidden; }
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -144,6 +152,7 @@ td.num, th.num-head { text-align: right; }
 .button { min-height: 36px; padding: 0 var(--step-4); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--raised); color: var(--ink); }
 .button.primary { background: var(--accent); border-color: var(--accent); color: #06231a; font-weight: 600; }
 
+/* The detail drawer: a fixed right-hand dialog over a dimmed backdrop, sections ruled apart. */
 .detail {
   position: fixed; top: 0; right: 0; bottom: 0; width: min(540px, 94vw); z-index: 10;
   background: var(--surface); border: 0; border-left: 1px solid var(--border); padding: var(--step-5);
@@ -176,6 +185,7 @@ td.num, th.num-head { text-align: right; }
 
 .foot { margin-top: var(--step-5); color: var(--faint); font-size: 12px; display: flex; flex-wrap: wrap; gap: var(--step-2) var(--step-4); justify-content: space-between; }
 
+/* Narrow screens: the lede stacks and the facts rail becomes a top-ruled block. */
 @media (max-width: 900px) {
   .shell { padding: var(--step-4); }
   .lede { grid-template-columns: 1fr; gap: var(--step-4); }

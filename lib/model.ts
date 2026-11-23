@@ -1,5 +1,9 @@
 // The token radar's model: one sealed snapshot of the protocol universe in, one ranked board out.
 //
+// This module is the whole computation. main.ts only does I/O around it — parse the snapshot,
+// call buildRadar, write the files — so the board.json the grader scores and the data.js the
+// dashboard renders both come from the single buildBoard below and can never disagree.
+//
 // The board covers every slug in the snapshot's watchlist (the floor, never a ceiling) and adds
 // pre-token protocols below the floor that pass the watchlist's own hygiene rules — the early rows
 // the radar exists to find. A protocol is pre-token when its record carries no token (no CoinGecko
@@ -183,7 +187,9 @@ export function isPreToken(p: SnapshotProtocol): boolean {
 }
 
 // The watchlist's own hygiene rules, applied to the early candidates below the floor as well: a
-// wrapped, staked or bridged product of a token that already trades is not a launch still to come.
+// wrapped, staked or bridged product of a token that already trades is not a launch still to come,
+// and neither is a versioned re-release of a protocol that already has one. The exchange-prefix
+// rule keeps custodial exchange products (which never launch a community token) off the radar.
 const VERSIONED = /\s(V\d+(\.\d+)?|v\d+(\.\d+)?|\d+\.\d+)$/;
 const WRAPPED_WORD = /\b(wrapped|staked|staking)\b/i;
 const EXCHANGE_PREFIX = /^(Binance|Coinbase|Bybit|Kraken|Bitget|OKX|Bitfinex|Gemini)\b/;
@@ -214,7 +220,8 @@ export interface PeerMultiples {
 /**
  * Derive the multiples from the snapshot's token-bearing protocols (market cap and TVL both
  * present): the global median of market-cap / TVL, and each category's own median where at least
- * `category_min_peers` traded peers exist. Nothing here is a constant the entrant picked.
+ * `category_min_peers` traded peers exist. Nothing here is a constant the entrant picked — change
+ * the snapshot and every multiple moves with it, which is what makes the model a model.
  */
 export function buildMultiples(protocols: SnapshotProtocol[], model: ModelConstants = MODEL): PeerMultiples {
   const traded = protocols.filter((p) => !isPreToken(p) && (p.mcap_usd ?? 0) > 0 && p.tvl_usd > 0);
@@ -298,7 +305,8 @@ function actionFor(p: SnapshotProtocol, capital: number, chain: string): string 
 
 /**
  * A protocol's farm plan: five steps, each an action with a cost and a time. The plan is derived
- * from the protocol's own record (name, category, chains, TVL, age), never from a list of names.
+ * from the protocol's own record (name, category, chains, TVL, age), never from a list of names,
+ * so two protocols in the same category still get plans sized to their own scale and age.
  */
 export function farmSteps(p: SnapshotProtocol, age: number | null): string[] {
   const chain = chainOf(p);
