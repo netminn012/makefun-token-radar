@@ -502,3 +502,134 @@ export function boardIssue(board: BoardRow[], snapshot: Snapshot): string | null
 export function dataScript(radar: RadarData): string {
   return `window.RADAR=${JSON.stringify(radar)};\n`;
 }
+
+// ---------------------------------------------------------------------------
+// Snapshot digest: descriptive statistics over the whole sealed snapshot.
+//
+// The board above scores a slice of the snapshot; the digest describes all of
+// it. It is computed from the protocol list alone — no model constants, no
+// ranking — so the dashboard can show the shape of the market the radar was
+// drawn from: how much of it is still pre-token, how concentrated its TVL is,
+// and which categories and chains dominate it. Everything here is a pure
+// function of the input order and values, so two runs over the same snapshot
+// produce the same digest byte for byte.
+
+/** One category's slice of the snapshot: how many protocols, holding how much TVL. */
+export interface CategorySlice {
+  category: string;
+  protocols: number;
+  tvl_usd: number;
+}
+
+/** One chain's slice of the snapshot: how many protocols run on it. */
+export interface ChainSlice {
+  chain: string;
+  protocols: number;
+}
+
+/** The digest itself: counts, TVL shape, and the snapshot's dominant corners. */
+export interface SnapshotDigest {
+  protocol_count: number;
+  /** Protocols the model treats as pre-token: no gecko id, no symbol, no market cap. */
+  pre_token_count: number;
+  /** pre_token_count as a share of protocol_count, rounded to 4 decimal places. */
+  pre_token_share: number;
+  /** Protocols recording no token at all: gecko_id and symbol both null. */
+  tokenless_count: number;
+  total_tvl_usd: number;
+  median_tvl_usd: number;
+  /** The ten largest protocols' TVL as a share of the total, rounded to 4 decimal places. */
+  top10_tvl_share: number;
+  /** The five largest categories by protocol count, each with its combined TVL. */
+  top_categories: CategorySlice[];
+  /** The five most common chains by protocol count. */
+  top_chains: ChainSlice[];
+  /** Median 7-day change across the protocols that report one; null when none do. */
+  median_change_7d: number | null;
+  /** How many protocols report a 7-day change at all. */
+  change_7d_reported: number;
+}
+
+/** The middle of a numeric list: the central value, or the mean of the two central ones. */
+function medianOf(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+/** Round a share to 4 decimal places so the digest stays short and stable in print. */
+function shareOf(part: number, whole: number): number {
+  if (whole <= 0) return 0;
+  return Math.round((part / whole) * 10000) / 10000;
+}
+
+/** Code-point name order: the tie-break that keeps every digest ordering reproducible. */
+function nameOrder(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * Describe one snapshot: its size, its pre-token weight, the shape of its TVL,
+ * and the categories and chains that dominate it. Reads the protocols once for
+ * the counts and sums, then sorts copies — the input array is never mutated.
+ */
+export function snapshotDigest(protocols: SnapshotProtocol[]): SnapshotDigest {
+  // One pass for the counts, the TVL total, and the per-category / per-chain tallies.
+  let preToken = 0;
+  let tokenless = 0;
+  let totalTvl = 0;
+  const byCategory = new Map<string, CategorySlice>();
+  const byChain = new Map<string, number>();
+  for (const p of protocols) {
+    totalTvl += p.tvl_usd;
+    if (p.gecko_id === null && p.symbol === null) {
+      tokenless += 1;
+      if (p.mcap_usd === null) preToken += 1;
+    }
+    const category = p.category ?? '(uncategorised)';
+    const slice = byCategory.get(category) ?? { category, protocols: 0, tvl_usd: 0 };
+    slice.protocols += 1;
+    slice.tvl_usd += p.tvl_usd;
+    byCategory.set(category, slice);
+    for (const chain of p.chains) byChain.set(chain, (byChain.get(chain) ?? 0) + 1);
+  }
+
+  // TVL concentration: the ten largest protocols against the whole snapshot.
+  const tvlsDesc = protocols.map((p) => p.tvl_usd).sort((a, b) => b - a);
+  const top10Tvl = tvlsDesc.slice(0, 10).reduce((sum, v) => sum + v, 0);
+
+  // The biggest corners of the snapshot, biggest first, names breaking ties.
+  const topCategories = [...byCategory.values()]
+    .sort((a, b) => b.protocols - a.protocols || b.tvl_usd - a.tvl_usd || nameOrder(a.category, b.category))
+    .slice(0, 5);
+  const topChains = [...byChain.entries()]
+    .map(([chain, count]) => ({ chain, protocols: count }))
+    .sort((a, b) => b.protocols - a.protocols || nameOrder(a.chain, b.chain))
+    .slice(0, 5);
+
+  // The typical 7-day move, over only the protocols that report one.
+  const changes = protocols.map((p) => p.change_7d).filter((v): v is number => v !== null);
+
+  return {
+    protocol_count: protocols.length,
+    pre_token_count: preToken,
+    pre_token_share: shareOf(preToken, protocols.length),
+    tokenless_count: tokenless,
+    total_tvl_usd: totalTvl,
+    median_tvl_usd: medianOf(protocols.map((p) => p.tvl_usd)),
+    top10_tvl_share: shareOf(top10Tvl, totalTvl),
+    top_categories: topCategories,
+    top_chains: topChains,
+    median_change_7d: changes.length === 0 ? null : medianOf(changes),
+    change_7d_reported: changes.length,
+  };
+}
+
+/**
+ * The digest as the data script's second statement: the dashboard's overview
+ * panel reads window.RADAR_DIGEST, and stays silent when it is absent.
+ */
+export function digestScript(protocols: SnapshotProtocol[]): string {
+  return `window.RADAR_DIGEST=${JSON.stringify(snapshotDigest(protocols))};\n`;
+}

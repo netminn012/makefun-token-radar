@@ -195,3 +195,113 @@ td.num, th.num-head { text-align: right; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }
+
+
+/* Overview panel (ov-): the snapshot digest, appended after the board. It reuses the
+   page's own surfaces and accent so it reads as part of the same sheet: one panel,
+   a grid of figure cards, then two ranked lists side by side. */
+.ov-panel {
+  margin-top: var(--step-6);
+  padding: var(--step-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+}
+
+.ov-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--step-4);
+}
+
+.ov-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.ov-copy {
+  flex: none;
+  padding: var(--step-2) var(--step-3);
+  background: var(--raised);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  font: 500 13px var(--font-body);
+  cursor: pointer;
+}
+
+.ov-copy:hover { border-color: var(--accent-dim); color: var(--accent); }
+.ov-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.ov-lede {
+  margin: var(--step-3) 0 var(--step-5);
+  color: var(--muted);
+  max-width: 68ch;
+}
+
+.ov-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--step-3);
+}
+
+.ov-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--step-1);
+  padding: var(--step-3) var(--step-4);
+  background: var(--raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+}
+
+.ov-stat-label {
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ov-stat-value {
+  color: var(--accent);
+  font: 600 22px/1.2 var(--font-num);
+}
+
+.ov-stat-note { color: var(--muted); font-size: 13px; }
+
+.ov-lists {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--step-5);
+  margin-top: var(--step-5);
+}
+
+.ov-list-title {
+  margin: 0 0 var(--step-2);
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.ov-list-items { margin: 0; padding: 0; list-style: none; }
+
+.ov-list-item {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--step-4);
+  padding: var(--step-2) 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.ov-list-name { color: var(--ink); }
+
+.ov-list-detail {
+  color: var(--muted);
+  font-family: var(--font-num);
+  font-size: 13px;
+  white-space: nowrap;
+}

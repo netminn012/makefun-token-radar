@@ -377,3 +377,130 @@
     if (e.key === 'Escape' && dialog.open) dialog.close();
   });
 })();
+
+
+// ---------------------------------------------------------------------------
+// Overview panel: an add-on drawn entirely from the data script's two globals.
+// window.RADAR_DIGEST describes the whole snapshot; window.RADAR's rows give
+// the board's own aggregates. The panel is optional by design — a data script
+// without a digest (an older build) leaves the page exactly as it was.
+(() => {
+  'use strict';
+
+  const digest = window.RADAR_DIGEST;
+  const radar = window.RADAR;
+  if (!digest || !radar || !Array.isArray(radar.rows)) return;
+
+  // --- Formatting: compact money, shares as percents, signed 7-day moves. ---
+  const money = (v) => {
+    if (v >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+    if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+    if (v >= 1e3) return `$${(v / 1e3).toFixed(1)}K`;
+    return `$${Math.round(v)}`;
+  };
+  const percent = (share) => `${(share * 100).toFixed(1)}%`;
+  const signed = (v) => (v === null ? 'n/a' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`);
+
+  // --- Board aggregates, computed here from the rows the page already has. ---
+  const implied = radar.rows.map((r) => r.implied_value_usd).sort((a, b) => a - b);
+  const totalImplied = implied.reduce((sum, v) => sum + v, 0);
+  const mid = Math.floor(implied.length / 2);
+  const medianImplied = implied.length === 0 ? 0 : implied.length % 2 === 1 ? implied[mid] : (implied[mid - 1] + implied[mid]) / 2;
+  const watchlistRows = radar.rows.filter((r) => r.on_watchlist).length;
+
+  // --- Small DOM helpers, so every figure lands as text, never as markup. ---
+  const el = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+  const stat = (label, value, note) => {
+    const box = el('div', 'ov-stat');
+    box.append(el('span', 'ov-stat-label', label), el('span', 'ov-stat-value', value));
+    if (note) box.append(el('span', 'ov-stat-note', note));
+    return box;
+  };
+  const rankedList = (title, items) => {
+    const wrap = el('div', 'ov-list');
+    wrap.append(el('h3', 'ov-list-title', title));
+    const list = el('ol', 'ov-list-items');
+    for (const [name, detail] of items) {
+      const item = el('li', 'ov-list-item');
+      item.append(el('span', 'ov-list-name', name), el('span', 'ov-list-detail', detail));
+      list.append(item);
+    }
+    wrap.append(list);
+    return wrap;
+  };
+
+  // The plain-text twin of the panel: what the copy button puts on the clipboard.
+  const summaryText = () =>
+    [
+      `Token Launch Radar — snapshot overview (${radar.as_of})`,
+      `Protocols: ${digest.protocol_count} · pre-token: ${digest.pre_token_count} (${percent(digest.pre_token_share)}) · no token recorded: ${digest.tokenless_count}`,
+      `TVL: ${money(digest.total_tvl_usd)} total · median ${money(digest.median_tvl_usd)} · top 10 hold ${percent(digest.top10_tvl_share)}`,
+      `Median 7d change: ${signed(digest.median_change_7d)} across ${digest.change_7d_reported} reporting protocols`,
+      `Top categories: ${digest.top_categories.map((c) => `${c.category} (${c.protocols}, ${money(c.tvl_usd)})`).join(' · ')}`,
+      `Top chains: ${digest.top_chains.map((c) => `${c.chain} (${c.protocols})`).join(' · ')}`,
+      `Board: ${radar.rows.length} rows · ${watchlistRows} watchlist · implied total ${money(totalImplied)} · median ${money(medianImplied)}`,
+    ].join('\n');
+
+  const render = () => {
+    const panel = el('section', 'ov-panel');
+    panel.setAttribute('aria-label', 'Snapshot overview');
+
+    const head = el('div', 'ov-head');
+    head.append(el('h2', 'ov-title', 'Snapshot overview'));
+    const copy = el('button', 'ov-copy', 'Copy summary');
+    copy.type = 'button';
+    copy.addEventListener('click', async () => {
+      // Clipboard API first; a throwaway textarea covers the contexts without it.
+      try {
+        await navigator.clipboard.writeText(summaryText());
+      } catch {
+        const area = document.createElement('textarea');
+        area.value = summaryText();
+        document.body.append(area);
+        area.select();
+        document.execCommand('copy');
+        area.remove();
+      }
+      copy.textContent = 'Copied';
+      setTimeout(() => { copy.textContent = 'Copy summary'; }, 1600);
+    });
+    head.append(copy);
+    panel.append(head);
+
+    panel.append(el('p', 'ov-lede',
+      `The board scores ${radar.rows.length} of the ${digest.protocol_count} protocols in the sealed snapshot. ` +
+      `This panel describes the whole set the radar was drawn from, straight from the snapshot itself.`));
+
+    const grid = el('div', 'ov-grid');
+    grid.append(
+      stat('Pre-token share', percent(digest.pre_token_share), `${digest.pre_token_count} of ${digest.protocol_count} protocols`),
+      stat('No token recorded', String(digest.tokenless_count), 'gecko id and symbol both absent'),
+      stat('Total TVL', money(digest.total_tvl_usd), `median protocol ${money(digest.median_tvl_usd)}`),
+      stat('Top-10 TVL concentration', percent(digest.top10_tvl_share), 'share held by the ten largest'),
+      stat('Median 7d change', signed(digest.median_change_7d), `${digest.change_7d_reported} protocols report one`),
+      stat('Board implied value', money(totalImplied), `median row ${money(medianImplied)} · ${watchlistRows} watchlist rows`),
+    );
+    panel.append(grid);
+
+    const lists = el('div', 'ov-lists');
+    lists.append(
+      rankedList('Largest categories', digest.top_categories.map((c) => [c.category, `${c.protocols} protocols · ${money(c.tvl_usd)} TVL`])),
+      rankedList('Most common chains', digest.top_chains.map((c) => [c.chain, `${c.protocols} protocols`])),
+    );
+    panel.append(lists);
+
+    // After the board in the page flow: the end of the board's own container,
+    // or the end of the body when the board cannot be found.
+    const board = document.getElementById('board');
+    (board && board.parentElement ? board.parentElement : document.body).append(panel);
+  };
+
+  // Scripts at the end of the body can run before the DOM settles; wait if needed.
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);
+  else render();
+})();
